@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, time
+from datetime import datetime, time
 import appdaemon.plugins.hass.hassapi as hass
 
 
@@ -44,10 +44,13 @@ class HomeMonitor(hass.Hass):
         """
         if new == "on":
             self.log("User is awake.")
-            self.set_state("binary_sensor.monitor_awake_state", state="awake")
+            self.set_state(self.awake_state, state="awake")
         elif new == "off":
             self.log("User is asleep.")
-            self.set_state("binary_sensor.monitor_awake_state", state="sleep")
+            self.set_state(self.awake_state, state="sleep")
+
+    def _local_timezone(self):
+        return datetime.now().astimezone().tzinfo
 
     def _parse_iso_datetime(self, value: str) -> datetime | None:
         if value is None:
@@ -65,7 +68,7 @@ class HomeMonitor(hass.Hass):
             dt = datetime.fromisoformat(v)
             # Ensure tz-aware (some integrations may omit tz)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=self._local_timezone())
             return dt
         except ValueError:
             # Fallback formats if needed
@@ -90,7 +93,9 @@ class HomeMonitor(hass.Hass):
 
         self.log(f"next_alarm_time: {next_alarm_time.isoformat()}", level="DEBUG")
 
-        current_time = datetime.now(timezone.utc).astimezone(next_alarm_time.tzinfo)
+        local_tz = self._local_timezone()
+        next_alarm_local = next_alarm_time.astimezone(local_tz)
+        current_time = datetime.now(local_tz)
         self.log(f"current_time: {current_time.isoformat()}", level="DEBUG")
 
         waking_hours_start = time(self.wake_time_start, 0)
@@ -104,17 +109,26 @@ class HomeMonitor(hass.Hass):
                 pass
             self._alarm_handle = None
 
-        if waking_hours_start <= next_alarm_time.time() <= waking_hours_end:
-            seconds_to_alarm = int((next_alarm_time - current_time).total_seconds())
+        alarm_time = next_alarm_local.time()
+        if waking_hours_start <= waking_hours_end:
+            in_window = waking_hours_start <= alarm_time <= waking_hours_end
+        else:
+            # Overnight window (e.g., 22:00 to 06:00)
+            in_window = (
+                alarm_time >= waking_hours_start or alarm_time <= waking_hours_end
+            )
 
-            # If it’s already in the past (or “now”), run soon rather than scheduling negative
+        if in_window:
+            seconds_to_alarm = int((next_alarm_local - current_time).total_seconds())
+
+            # If it's already in the past (or "now"), run soon rather than scheduling negative
             if seconds_to_alarm <= 0:
                 seconds_to_alarm = 0
 
             self._alarm_handle = self.run_in(self.alarm_triggered, seconds_to_alarm)
 
             # HA state should be a string, not a datetime object
-            self.set_state("sensor.next_awake_time", state=next_alarm_time.isoformat())
+            self.set_state("sensor.next_awake_time", state=next_alarm_local.isoformat())
 
             self.log(
                 f"Scheduled alarm_triggered in {seconds_to_alarm} seconds", level="INFO"
@@ -126,7 +140,7 @@ class HomeMonitor(hass.Hass):
         """
         Callback for when the alarm time is hit.
         """
-        self.log("Alarm was hit. Setting user state to asleep.")
+        self.log("Alarm was hit. Setting user state to awake.")
         self.turn_on(self.ux_awake_state)
         self.set_state(self.awake_state, state="awake")
 
