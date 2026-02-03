@@ -1,11 +1,11 @@
 Monitor:
   # App definitions
-  module: Monitor
-  class: Monitor
+  module: HomeMonitor
+  class: HomeMonitor
   log_level: DEBUG
   # HMI varaibles
   ux_awake_state: input_boolean.ux_awake_state
-  next_alarm_sensor: sensor.arekphone_next_alarm
+  next_alarm_sensor: sensor.sm_g990b2_next_alarm
   awake_state: binary_sensor.monitor_awake_state
   #Config
   reset_time: "9:00:00"
