@@ -122,7 +122,7 @@ class HomeMonitor(hass.Hass):
         else:
             self.log("Alarm is outside of waking hours, ignoring.", level="INFO")
 
-    def alarm_triggered(self, _: Any) -> None:
+    def alarm_triggered(self, _) -> None:
         """
         Callback for when the alarm time is hit.
         """
@@ -130,7 +130,7 @@ class HomeMonitor(hass.Hass):
         self.turn_on(self.ux_awake_state)
         self.set_state(self.awake_state, state="awake")
 
-    def reset_awake(self, _: Any) -> None:
+    def reset_awake(self, _) -> None:
         """
         Callback for reset awake state
         """
