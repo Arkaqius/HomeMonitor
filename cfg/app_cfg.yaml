@@ -1,13 +1,58 @@
 Monitor:
-  # App definitions
   module: HomeMonitor
   class: HomeMonitor
-  log_level: DEBUG
-  # HMI varaibles
-  ux_awake_state: input_boolean.ux_awake_state
-  next_alarm_sensor: sensor.sm_g990b2_next_alarm
-  awake_state: binary_sensor.monitor_awake_state
-  #Config
-  reset_time: "9:00:00"
-  wake_time_start: 3
-  wake_time_end: 9
+  log_level: WARNING
+
+  # Monitor owns this abstract state and restores it from retained MQTT state.
+  # Arek's valid morning alarm wakes the house; 09:00 is the safety deadline.
+  activity:
+    initial_state: awake
+    wake_alarm_person: arek
+    wake_alarm_start_hour: 3
+    wake_alarm_end_hour: 9
+    force_wake_time: "09:00:00"
+
+  # Inputs fused into stable abstract context. This component only observes them.
+  persons:
+    arek:
+      name: Arek
+      person_entity: person.arek
+      work_zone_entity: zone.praca_arka
+      android_auto_entity: binary_sensor.sm_g990b2_android_auto
+      next_alarm_entity: sensor.sm_g990b2_next_alarm
+    sabina:
+      name: Sabina
+      person_entity: person.sabina
+      android_auto_entity: binary_sensor.galaxys21_android_auto
+      next_alarm_entity: sensor.galaxys21_next_alarm
+
+  # GPS home-zone changes must remain stable before abstract presence changes.
+  presence:
+    home_confirm_seconds: 60
+    away_confirm_seconds: 120
+    unavailable_grace_seconds: 300
+
+  context:
+    sun_entity: sun.sun
+    morning_start_hour: 5
+    evening_start_hour: 18
+    night_start_hour: 22
+    max_alarm_future_hours: 36
+
+  # Stateless control exposed as button.home_monitor_sleep_wake.
+  # A press sleeps an awake house. It wakes a sleeping house only in this window.
+  controls:
+    sleep_wake_button_name: Sleep / Wake
+    button_wake_time_start: 3
+    button_wake_time_end: 12
+
+  # Same retained MQTT discovery convention as the other AppDaemon projects.
+  mqtt_namespace: mqtt
+  mqtt_discovery_prefix: homeassistant
+  mqtt_base_topic: home_monitor
+  mqtt_device_id: home_monitor
+  mqtt_device_name: Home Monitor
+  mqtt_qos: 0
+  mqtt_retain_state: false
+  mqtt_expire_after: 180
+  heartbeat_seconds: 60
